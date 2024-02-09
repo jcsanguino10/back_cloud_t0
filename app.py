@@ -174,7 +174,7 @@ async def create_task(task: schema.CreateTask, current_user: Annotated[schema.Us
 @app.get("/task/{task_id}")
 async def get_task_id(task_id: int, current_user: Annotated[schema.UserData, Depends(get_current_user)]):
     db_task = crud.get_task(db, task_id)
-    validate_user(current_user, db_task.user)
+    validate_user(current_user.id, db_task.user)
     if not db_task:
         raise HTTPException(status_code=400, detail="Task not exists")
     return db_task
