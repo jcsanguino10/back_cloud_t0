@@ -3,29 +3,15 @@ import entities, schema
 import imghdr
 from fastapi import UploadFile
 
-FOLDER_URL = "./image_user"
+FOLDER_URL = "./images_users"
 default_url_icon = "example.com"
 
 # User
 
-def is_image(file_extension):
-    allowed_extensions = ["jpeg", "jpg", "png", "gif"]
-    return file_extension.lower() in allowed_extensions
-
-async def validate_image(file: UploadFile):
-    content_type, _ = file.content_type.split("/")
-    if content_type.lower() != "image":
-        raise Exception("File is not an image")
-    
-    file_extension = imghdr.what(None, h=file.file.read(2048))
-    if not file_extension or not is_image(file_extension):
-        raise Exception("File is not a valid image")
-
 def save_image_user(user_id:str, file: UploadFile):
-    validate_image(file)
     try:
-        url_img = f"{FOLDER_URL}/user_{user_id}"
-        with open(file.filename, "wb") as image_file:
+        url_img = f"{FOLDER_URL}/user_{user_id}.{file.filename.split('.')[-1]}"
+        with open(url_img, "wb") as image_file:
             image_file.write(file.file.read())
         return url_img
     except:
@@ -44,18 +30,18 @@ def get_user_by_name(db: Session, name: str):
 def get_users(db: Session, skip: int = 0, limit: int = 100):
     return db.query(entities.User).offset(skip).limit(limit).all()
 
-def create_user(db: Session, user: schema.CreateUser):
+def create_user(db: Session, name:str, password:str, image: UploadFile):
     db_user = entities.User(
-        name = user.name,
-        password = user.password,
+        name = name,
+        password = password,
         image = str(default_url_icon)
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     try:
-        if user.image is not None:
-            db_user.image = save_image_user(db_user.id, user.image)
+        if image is not None:
+            db_user.image = save_image_user(db_user.id, image)
             db.commit()
             db.refresh(db_user)
     except:

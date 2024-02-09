@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Annotated
 import crud, entities, schema
 from fastapi.security import OAuth2PasswordBearer,OAuth2PasswordRequestForm
@@ -15,6 +16,18 @@ entities.Base.metadata.drop_all(bind=engine)
 entities.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+origins = [
+    "http://localhost:3000",  # Update with your React app's origin
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 db = SessionLocal()
 
@@ -35,7 +48,6 @@ def create_access_token(data: dict):
 
 async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
     try:
-        print(token)
         payload = jwt.decode(token, key=SECRET_KEY)
         username= int(payload.get("sub"))
         if username is None:
@@ -91,18 +103,20 @@ async def login_for_access_token(
     access_token = create_access_token(data={"sub": str(user.id)})
     return schema.Token(access_token=access_token, token_type="bearer")
 
+@app.get("/user")
+async def get_info_user(user: Annotated[schema.UserData, Depends(get_current_user)]):
+    return user
 
 @app.post("/user")
-async def create_user(user: schema.CreateUser):
-    db_user = crud.get_user_by_name(db, user.name)
+async def create_user(name: str = Form(...), password:str = Form(...), image: UploadFile = File(None)):
+    db_user = crud.get_user_by_name(db, name)
     if db_user:
         raise HTTPException(status_code=400, detail="User already registered")
     else:
-        db_user = crud.create_user(db, user)
-        # try:
-        #     db_user = crud.create_user(db, user)
-        # except Exception as exp:
-        #     raise HTTPException(status_code=400, detail=str(exp))
+        try:
+            db_user = crud.create_user(db, name, password, image)
+        except Exception as exp:
+            raise HTTPException(status_code=400, detail=str(exp))
     return db_user
 
 
@@ -176,14 +190,14 @@ async def update_task(task_id: str, task:schema.TaskData, current_user: Annotate
     return "Task updated!"
 
 @app.get("/tasks/user/{user_id}")
-def get_task_user(user: Annotated[str, Depends(get_current_user)]):
+def get_task_user(user_id:str ,user: Annotated[str, Depends(get_current_user)]):
+    validate_user(user_id, str(user.id))
     db_tasks = crud.get_tasks_by_user(db,user.id)
-    validate_user(db_tasks[0], user.id)
     return db_tasks
 
 @app.delete("/task/{task_id}")
 async def del_task(task_id: int, current_user: Annotated[schema.UserData, Depends(get_current_user)]):
-    task = crud.get_task(task_id)
+    task = crud.get_task(db,task_id)
     validate_user(task.user, current_user.id)
     answer = crud.delete_task(db, task_id)
     if not answer:

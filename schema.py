@@ -12,17 +12,12 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     id_user: int | None = None
 
-class CreateUser(BaseModel):
+
+class UserData(BaseModel):
+    id: int
     name : str
     password : str
-    image:  Optional[UploadFile] = File(None)
-
-
-class UserData(CreateUser):
-    id: int
-    field_with_different_type: Union[UploadFile, str]
-    class Config:
-        orm_mode = True
+    image: str
 
 class CreateTask(BaseModel):
     text: str
@@ -39,7 +34,6 @@ class TaskData(CreateTask):
 
 class CreateCategory(BaseModel):
     name : str
-    description : str
 
 class CategoryData(CreateCategory):
     id: int
